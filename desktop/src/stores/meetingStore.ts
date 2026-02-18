@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AudioDevice, Meeting, MeetingNotes, PersonalityMode } from "../lib/types";
 
 export type ActiveView = "meetings" | "memos" | "search" | "memory" | "settings";
-export type MeetingSubView = "summary" | "transcript" | "topics";
+export type MeetingSubView = "summary" | "timeline" | "transcript" | "topics";
 
 interface MeetingState {
   // Navigation
@@ -24,10 +24,12 @@ interface MeetingState {
   selectedMeetingId: string | null;
   selectedMeetingNotes: MeetingNotes | null;
   meetingSubView: MeetingSubView;
+  selectedTopicId: string | null;
   setMeetings: (meetings: Meeting[]) => void;
   selectMeeting: (id: string | null) => void;
   setMeetingNotes: (notes: MeetingNotes | null) => void;
   setMeetingSubView: (view: MeetingSubView) => void;
+  setSelectedTopicId: (id: string | null) => void;
 
   // Personality
   personalityMode: PersonalityMode;
@@ -51,10 +53,12 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   selectedMeetingId: null,
   selectedMeetingNotes: null,
   meetingSubView: "summary",
+  selectedTopicId: null,
   setMeetings: (meetings) => set({ meetings }),
-  selectMeeting: (id) => set({ selectedMeetingId: id, selectedMeetingNotes: null }),
+  selectMeeting: (id) => set({ selectedMeetingId: id, selectedMeetingNotes: null, selectedTopicId: null, meetingSubView: "summary" }),
   setMeetingNotes: (notes) => set({ selectedMeetingNotes: notes }),
   setMeetingSubView: (view) => set({ meetingSubView: view }),
+  setSelectedTopicId: (id) => set({ selectedTopicId: id }),
 
   personalityMode: "neutral",
   setPersonalityMode: (mode) => set({ personalityMode: mode }),

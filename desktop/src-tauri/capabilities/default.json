@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicetip/tauri/dev/crates/tauri/schema.json",
+  "identifier": "default",
+  "description": "Default capability for LIME desktop app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open"
+  ]
+}

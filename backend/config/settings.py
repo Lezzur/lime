@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     consolidation_max_daily_runs: int = 1             # At most N consolidation runs per day
     consolidation_forced_interval_days: int = 14      # Forced run if no idle window in N days
 
+    # Web Push (VAPID)
+    vapid_private_key: Optional[str] = None
+    vapid_mailto: Optional[str] = None
+
     def model_post_init(self, __context):
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.exports_dir.mkdir(parents=True, exist_ok=True)

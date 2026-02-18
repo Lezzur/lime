@@ -15,6 +15,7 @@ from backend.learning.scheduler import scheduler as consolidation_scheduler
 from backend.api.routes import router
 from backend.api.knowledge_routes import router as knowledge_router
 from backend.api.websocket import ws_live_transcript
+from backend.api.push_routes import router as push_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,6 +65,7 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(knowledge_router)
+app.include_router(push_router)
 
 
 @app.websocket("/ws/live/{meeting_id}")

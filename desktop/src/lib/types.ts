@@ -35,6 +35,9 @@ export interface ActionItem {
   priority: "high" | "medium" | "low";
   confidence: number;
   source_quote?: string;
+  below_threshold?: boolean;
+  source_start_time?: number;
+  source_end_time?: number;
 }
 
 export interface Decision {
@@ -44,12 +47,19 @@ export interface Decision {
   participants?: string[];
   confidence: number;
   source_quote?: string;
+  below_threshold?: boolean;
+  source_start_time?: number;
+  source_end_time?: number;
 }
 
 export interface Insight {
   id: string;
   type: string;
+  title?: string;
+  description?: string;
   content: string;
+  priority?: "high" | "medium" | "low";
+  reasoning?: string;
   confidence: number;
 }
 
@@ -74,13 +84,21 @@ export interface TopicSegment {
 }
 
 export interface MeetingNotes {
+  analysis_id?: string;
   executive_summary?: string;
   sentiment?: string;
+  overall_confidence?: number;
   action_items: ActionItem[];
   decisions: Decision[];
   topics: TopicSegment[];
   connections: Connection[];
   insights: Insight[];
+}
+
+export interface ConnectionsData {
+  meeting_id: string;
+  meeting_title?: string;
+  connections: Connection[];
 }
 
 export type PersonalityMode = "neutral" | "strategist" | "analyst" | "coach";

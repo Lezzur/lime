@@ -1,0 +1,7 @@
+// !$*UTF8*$!
+// NOTE: This is a minimal project file. For full Xcode project generation,
+// open this folder in Xcode via File > New > Project and select the LIME directory,
+// or run `xcodegen` with the spec below.
+//
+// This file serves as documentation of the project configuration.
+// Use the Package.swift or xcodegen spec for actual project generation.

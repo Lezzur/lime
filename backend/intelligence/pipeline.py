@@ -234,6 +234,26 @@ class PostMeetingPipeline:
             # Set status to complete
             self._set_status(meeting_id, MeetingStatus.complete)
 
+            # Fire push notification to web app subscribers
+            try:
+                from backend.api.push_routes import send_push_notification
+                action_count = len(actions_data.get("action_items", []))
+                decision_count = len(decisions_data.get("decisions", []))
+                body_parts = []
+                if action_count:
+                    body_parts.append(f"{action_count} action item{'s' if action_count > 1 else ''}")
+                if decision_count:
+                    body_parts.append(f"{decision_count} decision{'s' if decision_count > 1 else ''}")
+                body = ", ".join(body_parts) if body_parts else "Meeting analysis complete"
+                send_push_notification(
+                    title="Meeting processed",
+                    body=body,
+                    meeting_id=meeting_id,
+                    tag="lime-meeting",
+                )
+            except Exception as push_err:
+                logger.debug(f"Push notification skipped: {push_err}")
+
             logger.info(
                 f"Pipeline complete for meeting {meeting_id} "
                 f"({processing_duration:.1f}s, confidence: {overall_confidence:.0%})"
