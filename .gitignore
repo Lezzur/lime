@@ -1,0 +1,41 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data (user data — never commit)
+data/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models (too large for git)
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# Memory (private — sync separately)
+memory/
+
+# Torch hub cache
+torch_cache/

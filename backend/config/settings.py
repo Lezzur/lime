@@ -1,0 +1,54 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+from pathlib import Path
+from typing import Optional, Literal
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Transcription
+    transcription_provider: Literal["deepgram", "assemblyai"] = "deepgram"
+    deepgram_api_key: Optional[str] = None
+    assemblyai_api_key: Optional[str] = None
+    whisper_model: Literal["large-v3", "medium", "small", "base", "auto"] = "auto"
+
+    # Diarization
+    huggingface_token: Optional[str] = None
+
+    # Database
+    database_url: str = f"sqlite:///{BASE_DIR}/data/db/lime.db"
+
+    # Audio
+    mic_device_index: Optional[int] = None
+    system_audio_device_index: Optional[int] = None
+    sample_rate: int = 16000          # 16kHz — Whisper's native rate
+    channels: int = 1                  # Mono
+    chunk_duration_min: float = 5.0   # Minimum chunk size in seconds
+    chunk_duration_max: float = 15.0  # Maximum chunk size in seconds
+    ring_buffer_seconds: int = 30     # Rolling audio buffer
+
+    # Server
+    api_host: str = "127.0.0.1"
+    api_port: int = 8000
+
+    # Storage
+    audio_dir: Path = BASE_DIR / "data" / "audio"
+    exports_dir: Path = BASE_DIR / "data" / "exports"
+    memory_dir: Path = BASE_DIR / "memory"
+
+    def model_post_init(self, __context):
+        self.audio_dir.mkdir(parents=True, exist_ok=True)
+        self.exports_dir.mkdir(parents=True, exist_ok=True)
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        (BASE_DIR / "data" / "db").mkdir(parents=True, exist_ok=True)
+
+
+settings = Settings()
