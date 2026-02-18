@@ -173,3 +173,52 @@ def get_active_meetings():
         {"meeting_id": mid, "elapsed_seconds": session._capture.elapsed_seconds}
         for mid, session in _active_sessions.items()
     ]
+
+
+# ── Memory Endpoints ──────────────────────────────────────────────────────────
+
+class MemoryUpdateRequest(BaseModel):
+    content: str
+
+
+@router.get("/memory/{tier}")
+def get_memory(tier: str):
+    """View a memory tier (short-term, medium-term, long-term)."""
+    from backend.learning.memory import MemoryTier, memory as mem_store
+    try:
+        mem_tier = MemoryTier(tier)
+    except ValueError:
+        raise HTTPException(400, f"Invalid tier: {tier}. Use short-term, medium-term, or long-term.")
+    return {"tier": tier, "content": mem_store.read_tier(mem_tier)}
+
+
+@router.patch("/memory/{tier}")
+def update_memory(tier: str, req: MemoryUpdateRequest):
+    """Edit a memory tier. User edits are high-priority learning signals."""
+    from backend.learning.memory import MemoryTier, memory as mem_store
+    try:
+        mem_tier = MemoryTier(tier)
+    except ValueError:
+        raise HTTPException(400, f"Invalid tier: {tier}. Use short-term, medium-term, or long-term.")
+    mem_store.update_tier(mem_tier, req.content)
+    return {"tier": tier, "status": "updated"}
+
+
+@router.post("/memory/consolidate")
+def trigger_consolidation():
+    """Manually trigger memory consolidation."""
+    from backend.learning.consolidation import consolidator
+    stats = consolidator.run()
+    return {"status": "complete", **stats}
+
+
+@router.post("/corrections")
+def submit_correction(
+    meeting_id: str = "",
+    original: str = "",
+    corrected: str = "",
+):
+    """Submit a transcription correction (feeds the learning loop)."""
+    from backend.learning.memory import memory as mem_store
+    mem_store.record_transcription_correction(original, corrected, meeting_id)
+    return {"status": "recorded"}
