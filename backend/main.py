@@ -16,6 +16,8 @@ from backend.api.routes import router
 from backend.api.knowledge_routes import router as knowledge_router
 from backend.api.websocket import ws_live_transcript
 from backend.api.push_routes import router as push_router
+from backend.api.crypto_routes import router as crypto_router
+from backend.api.sync_routes import router as sync_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,9 +43,18 @@ async def lifespan(app: FastAPI):
     logger.info(f"Vector store: {vector_store.stats()}")
     compressor.start()
     consolidation_scheduler.start()
+    # Initialize sync engine (if enabled)
+    if settings.sync_enabled:
+        from backend.sync.engine import sync_engine
+        sync_engine.initialize()
+        await sync_engine.start_auto_sync()
+        logger.info("Sync engine initialized (device: %s)", sync_engine.device_id)
     logger.info(f"API ready at http://{settings.api_host}:{settings.api_port}")
     yield
     logger.info("LIME backend shutting down...")
+    if settings.sync_enabled:
+        from backend.sync.engine import sync_engine
+        await sync_engine.stop_auto_sync()
     consolidation_scheduler.stop()
     compressor.stop()
 
@@ -66,6 +77,8 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(knowledge_router)
 app.include_router(push_router)
+app.include_router(crypto_router)
+app.include_router(sync_router)
 
 
 @app.websocket("/ws/live/{meeting_id}")

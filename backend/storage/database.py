@@ -20,6 +20,7 @@ def init_db():
     """Create all tables. Call once on startup."""
     import backend.models.meeting  # noqa: F401 — register models
     import backend.models.knowledge  # noqa: F401 — register knowledge graph models
+    import backend.sync.models  # noqa: F401 — register sync models
     Base.metadata.create_all(bind=engine)
 
 
