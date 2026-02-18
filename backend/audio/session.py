@@ -98,11 +98,11 @@ class MeetingSession:
         self._chunker.stop()
         self._transcription.stop()
 
-        # Update DB record
+        # Update DB record — status stays as 'processing' until pipeline finishes
         with get_db() as db:
             meeting = db.get(Meeting, self.meeting_id)
             if meeting:
-                meeting.status = MeetingStatus.complete
+                meeting.status = MeetingStatus.processing
                 meeting.ended_at = datetime.now(timezone.utc)
                 meeting.duration_seconds = duration
                 if raw_path:
@@ -111,6 +111,20 @@ class MeetingSession:
         # Schedule compression as background task
         if raw_path and raw_path.exists():
             compressor.enqueue(raw_path)
+
+        # Auto-trigger post-meeting analysis in background
+        meeting_id = self.meeting_id
+        def _run_pipeline():
+            try:
+                from backend.intelligence.pipeline import pipeline
+                pipeline.process(meeting_id)
+            except Exception as e:
+                logger.error(f"Post-meeting pipeline failed for {meeting_id}: {e}")
+
+        pipeline_thread = threading.Thread(
+            target=_run_pipeline, daemon=True, name=f"pipeline-{meeting_id[:8]}"
+        )
+        pipeline_thread.start()
 
         return {
             "meeting_id": self.meeting_id,

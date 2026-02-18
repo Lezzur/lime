@@ -1,4 +1,4 @@
-# LIME — Phase 1 Dependencies
+# LIME — Phase 1 + Phase 2 Dependencies
 
 # API Server
 fastapi==0.115.5
@@ -41,6 +41,17 @@ pydantic-settings==2.6.1
 # CLI
 typer==0.14.0
 rich==13.9.4
+
+# Knowledge Graph
+networkx==3.4.2
+
+# Vector Store & Embeddings (Phase 2)
+chromadb==0.5.23
+sentence-transformers==3.3.1
+
+# LLM Providers (Phase 2)
+anthropic==0.39.0
+openai==1.55.3
 
 # Utilities
 aiofiles==24.1.0

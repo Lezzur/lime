@@ -11,7 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config.settings import settings
 from backend.storage.database import init_db
 from backend.audio.compressor import compressor
+from backend.learning.scheduler import scheduler as consolidation_scheduler
 from backend.api.routes import router
+from backend.api.knowledge_routes import router as knowledge_router
 from backend.api.websocket import ws_live_transcript
 
 logging.basicConfig(
@@ -30,16 +32,24 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("LIME backend starting...")
     init_db()
+    # Initialize knowledge graph (loads from JSON if exists)
+    from backend.knowledge.graph import knowledge_graph  # noqa: F401
+    logger.info(f"Knowledge graph: {knowledge_graph.stats()}")
+    # Initialize ChromaDB vector store
+    from backend.storage.vector_store import vector_store  # noqa: F401
+    logger.info(f"Vector store: {vector_store.stats()}")
     compressor.start()
+    consolidation_scheduler.start()
     logger.info(f"API ready at http://{settings.api_host}:{settings.api_port}")
     yield
     logger.info("LIME backend shutting down...")
+    consolidation_scheduler.stop()
     compressor.stop()
 
 
 app = FastAPI(
     title="LIME",
-    description="Cognitive meeting companion — Phase 1: Audio Foundation",
+    description="Cognitive meeting companion — Phase 2: Intelligence & Memory",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -53,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(knowledge_router)
 
 
 @app.websocket("/ws/live/{meeting_id}")

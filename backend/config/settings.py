@@ -44,6 +44,21 @@ class Settings(BaseSettings):
     exports_dir: Path = BASE_DIR / "data" / "exports"
     memory_dir: Path = BASE_DIR / "memory"
 
+    # LLM Provider
+    llm_provider: Literal["ollama", "anthropic", "openai"] = "ollama"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.1"
+    anthropic_api_key: Optional[str] = None
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4o"
+    confidence_badge_threshold: float = 0.7
+
+    # Memory Consolidation
+    consolidation_check_interval: float = 60.0       # Seconds between idle checks
+    consolidation_max_daily_runs: int = 1             # At most N consolidation runs per day
+    consolidation_forced_interval_days: int = 14      # Forced run if no idle window in N days
+
     def model_post_init(self, __context):
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.exports_dir.mkdir(parents=True, exist_ok=True)
