@@ -143,7 +143,7 @@ export default function CapturePage() {
   const handleDismissAlert = useCallback((id: string) => {
     setAlerts((prev) => {
       const remaining = prev.filter((a) => a.id !== id);
-      const maxUrgency = remaining.reduce((m, a) => Math.max(m, a.urgency), 0) as UrgencyLevel;
+      const maxUrgency = remaining.reduce<number>((m, a) => Math.max(m, a.urgency), 0) as UrgencyLevel;
       setUrgency(maxUrgency || 1);
       return remaining;
     });
