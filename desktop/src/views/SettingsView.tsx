@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Save, Loader2, RefreshCw, Swords } from "lucide-react";
 import type { AppSettings, SparringConfig } from "../lib/types";
 import { api } from "../lib/api";
-import { useMeetingStore } from "../stores/meetingStore";
 
 const DEFAULT_SETTINGS: AppSettings = {
   llm_provider: "ollama",

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Shield, Swords, BookOpen, X } from "lucide-react";
 import { useMeetingStore } from "../stores/meetingStore";
 import type { PersonalityMode } from "../lib/types";
