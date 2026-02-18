@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 enum AppTab: Hashable {
-    case capture, meetings, memos, settings
+    case capture, meetings, memos, memory, settings
 }
 
 enum CaptureMode: String, CaseIterable {

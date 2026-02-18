@@ -4,15 +4,8 @@ import MeetingsListView from "./MeetingsListView";
 import MeetingDetailView from "./MeetingDetailView";
 import SearchView from "./SearchView";
 import SettingsView from "./SettingsView";
+import MemoryView from "./MemoryView";
 import RecordingBar from "../components/RecordingBar";
-
-function MemoryView() {
-  return (
-    <div className="flex items-center justify-center h-full text-[var(--lime-text-muted)] text-sm">
-      Memory view — coming in next sprint
-    </div>
-  );
-}
 
 function MemosView() {
   return (

@@ -1,4 +1,4 @@
-import type { AudioDevice, Meeting, MeetingNotes, TranscriptSegment, AppSettings } from "./types";
+import type { AudioDevice, Meeting, MeetingNotes, TranscriptSegment, AppSettings, CrossMeetingData } from "./types";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -58,9 +58,20 @@ export const api = {
   patchSettings: (data: Partial<AppSettings>) =>
     request<AppSettings>("/api/settings", { method: "PATCH", body: JSON.stringify(data) }),
 
+  // Cross-meeting connections
+  getCrossMeetingConnections: (meetingId?: string) => {
+    const params = meetingId ? `?meeting_id=${meetingId}` : "";
+    return request<CrossMeetingData>(`/api/connections/cross-meeting${params}`);
+  },
+
   // Memory
   getMemory: (tier: "short-term" | "medium-term" | "long-term") =>
     request<{ content: string }>(`/api/memory/${tier}`),
+  updateMemory: (tier: "short-term" | "medium-term" | "long-term", content: string) =>
+    request<{ status: string }>(`/api/memory/${tier}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    }),
   consolidateMemory: () =>
     request<{ status: string }>("/api/memory/consolidate", { method: "POST" }),
 };

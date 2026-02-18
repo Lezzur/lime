@@ -81,6 +81,22 @@ final class APIClient {
         return try await get("/api/search?q=\(encoded)")
     }
 
+    // MARK: - Memory
+
+    func getMemory(tier: String) async throws -> String {
+        let response: MemoryResponse = try await get("/api/memory/\(tier)")
+        return response.content
+    }
+
+    func updateMemory(tier: String, content: String) async throws {
+        let body: [String: Any] = ["content": content]
+        let _: EmptyResponse = try await patch("/api/memory/\(tier)", body: body)
+    }
+
+    func triggerConsolidation() async throws {
+        let _: EmptyResponse = try await post("/api/memory/consolidate", body: [:])
+    }
+
     // MARK: - Sync
 
     func triggerSync() async throws {
@@ -120,6 +136,17 @@ final class APIClient {
         return try JSONDecoder.lime.decode(T.self, from: data)
     }
 
+    private func patch<T: Decodable>(_ path: String, body: [String: Any]) async throws -> T {
+        let url = baseURL.appendingPathComponent(path)
+        var request = makeRequest(url: url, method: "PATCH")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response)
+        return try JSONDecoder.lime.decode(T.self, from: data)
+    }
+
     private func makeRequest(url: URL, method: String) -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -144,6 +171,7 @@ final class APIClient {
 struct StartMeetingResponse: Decodable { let meetingID: String }
 struct VoiceMemoUploadResponse: Decodable { let memoID: String }
 struct EmptyResponse: Decodable {}
+struct MemoryResponse: Decodable { let tier: String; let content: String }
 
 struct MeetingNotes: Decodable {
     let summary: ExecutiveSummary

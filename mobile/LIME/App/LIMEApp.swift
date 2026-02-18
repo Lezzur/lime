@@ -56,6 +56,13 @@ struct MainTabView: View {
                 }
                 .tag(AppTab.memos)
 
+            MemoryView()
+                .tabItem {
+                    Image(systemName: "brain")
+                    Text("Memory")
+                }
+                .tag(AppTab.memory)
+
             SettingsView()
                 .tabItem {
                     Image(systemName: "gear")
