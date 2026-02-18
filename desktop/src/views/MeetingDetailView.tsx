@@ -7,11 +7,13 @@ import { useMeetingStore } from "../stores/meetingStore";
 import ExecutiveSummary from "../components/ExecutiveSummary";
 import TranscriptView from "../components/TranscriptView";
 import TopicTimeline from "../components/TopicTimeline";
+import TimelineTab from "../components/timeline/TimelineTab";
 
-type SubView = "summary" | "transcript" | "topics";
+type SubView = "summary" | "timeline" | "transcript" | "topics";
 
 const TABS: { id: SubView; label: string }[] = [
   { id: "summary", label: "Summary" },
+  { id: "timeline", label: "Timeline" },
   { id: "topics", label: "Topics" },
   { id: "transcript", label: "Transcript" },
 ];
@@ -115,6 +117,11 @@ export default function MeetingDetailView({ meetingId, onBack }: Props) {
           <>
             {subView === "summary" && (
               <ExecutiveSummary meetingId={meetingId} notes={selectedMeetingNotes} />
+            )}
+            {subView === "timeline" && (
+              <TimelineTab
+                totalDuration={meeting?.duration_seconds ?? 0}
+              />
             )}
             {subView === "topics" && (
               <TopicTimeline
