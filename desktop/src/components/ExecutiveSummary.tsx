@@ -2,8 +2,8 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useState } from "react";
-import { CheckSquare, AlertCircle, Lightbulb, Link2, Edit2, Check, X } from "lucide-react";
-import type { MeetingNotes, ActionItem, Decision } from "../lib/types";
+import { CheckSquare, AlertCircle, Lightbulb, Link2, Edit2, Check, X, AlertTriangle, Network } from "lucide-react";
+import type { MeetingNotes, ActionItem, Decision, Connection } from "../lib/types";
 import { api } from "../lib/api";
 import { useMeetingStore } from "../stores/meetingStore";
 
@@ -160,6 +160,57 @@ function DecisionRow({ item }: { item: Decision }) {
   );
 }
 
+function ConnectionRow({ conn }: { conn: Connection }) {
+  const typeLabel = conn.connection_type?.replace(/_/g, " ");
+  const typeColors: Record<string, string> = {
+    shared_topic: "text-lime-400 bg-lime-500/10 border-lime-500/20",
+    shared_person: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+    follow_up: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+    decision_referenced: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+    action_dependency: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+    recurring_theme: "text-pink-400 bg-pink-500/10 border-pink-500/20",
+  };
+  const badgeColor = conn.connection_type
+    ? typeColors[conn.connection_type] ?? "text-[var(--lime-text-muted)] bg-white/5 border-[var(--lime-border)]"
+    : "";
+
+  return (
+    <div className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--lime-surface-2)] border border-[var(--lime-border)] text-xs">
+      <Link2 size={12} className="text-[var(--lime-text-dim)] mt-0.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[var(--lime-text)] font-medium">
+            {conn.meeting_title ?? conn.meeting_id}
+          </span>
+          {conn.connection_type && (
+            <span className={`text-[10px] px-1 py-0.5 rounded border ${badgeColor}`}>
+              {typeLabel}
+            </span>
+          )}
+          {conn.strength != null && (
+            <span className="text-[10px] text-[var(--lime-text-dim)]">
+              {Math.round(conn.strength * 100)}% match
+            </span>
+          )}
+        </div>
+        <p className="text-[var(--lime-text-muted)] mt-0.5">{conn.relationship}</p>
+        {conn.shared_entities && conn.shared_entities.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {conn.shared_entities.map((e, j) => (
+              <span
+                key={j}
+                className="text-[10px] px-1 py-0.5 rounded bg-white/5 text-[var(--lime-text-dim)]"
+              >
+                {e.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ExecutiveSummary({ meetingId, notes }: Props) {
   return (
     <div className="space-y-6 p-6 selectable">
@@ -234,23 +285,41 @@ export default function ExecutiveSummary({ meetingId, notes }: Props) {
       {/* Connections */}
       {notes.connections?.length > 0 && (
         <section>
-          <h3 className="text-xs uppercase tracking-widest text-[var(--lime-text-dim)] mb-2">
-            Linked Meetings
+          <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-[var(--lime-text-dim)] mb-2">
+            <Network size={11} />
+            Linked Meetings ({notes.connections.length})
           </h3>
           <div className="space-y-1.5">
-            {notes.connections.map((conn, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--lime-surface-2)] border border-[var(--lime-border)] text-xs"
-              >
-                <Link2 size={11} className="text-[var(--lime-text-dim)] shrink-0" />
-                <span className="text-[var(--lime-text)] font-medium">
-                  {conn.meeting_title ?? conn.meeting_id}
-                </span>
-                <span className="text-[var(--lime-text-dim)]">—</span>
-                <span className="text-[var(--lime-text-muted)]">{conn.relationship}</span>
-              </div>
-            ))}
+            {/* Contradictions first */}
+            {notes.connections
+              .filter((c) => c.is_contradiction)
+              .map((conn, i) => (
+                <div
+                  key={`contra-${i}`}
+                  className="flex items-start gap-2.5 p-2.5 rounded-lg bg-red-500/5 border border-red-500/20 text-xs"
+                >
+                  <AlertTriangle size={12} className="text-red-400 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-red-300 font-medium">
+                        {conn.meeting_title ?? conn.meeting_id}
+                      </span>
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                        contradiction
+                      </span>
+                    </div>
+                    <p className="text-[var(--lime-text-muted)] mt-0.5">
+                      {conn.contradiction_detail ?? conn.relationship}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            {/* Normal connections */}
+            {notes.connections
+              .filter((c) => !c.is_contradiction)
+              .map((conn, i) => (
+                <ConnectionRow key={`conn-${i}`} conn={conn} />
+              ))}
           </div>
         </section>
       )}

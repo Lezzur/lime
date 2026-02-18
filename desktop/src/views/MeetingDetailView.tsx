@@ -8,14 +8,16 @@ import ExecutiveSummary from "../components/ExecutiveSummary";
 import TranscriptView from "../components/TranscriptView";
 import TopicTimeline from "../components/TopicTimeline";
 import TimelineTab from "../components/timeline/TimelineTab";
+import CrossMeetingConnections from "../components/CrossMeetingConnections";
 
-type SubView = "summary" | "timeline" | "transcript" | "topics";
+type SubView = "summary" | "timeline" | "transcript" | "topics" | "connections";
 
 const TABS: { id: SubView; label: string }[] = [
   { id: "summary", label: "Summary" },
   { id: "timeline", label: "Timeline" },
   { id: "topics", label: "Topics" },
   { id: "transcript", label: "Transcript" },
+  { id: "connections", label: "Connections" },
 ];
 
 interface Props {
@@ -131,6 +133,9 @@ export default function MeetingDetailView({ meetingId, onBack }: Props) {
             )}
             {subView === "transcript" && (
               <TranscriptView meetingId={meetingId} segments={segments} />
+            )}
+            {subView === "connections" && (
+              <CrossMeetingConnections meetingId={meetingId} />
             )}
           </>
         ) : (

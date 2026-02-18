@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Save, Loader2, RefreshCw } from "lucide-react";
-import type { AppSettings } from "../lib/types";
+import { Save, Loader2, RefreshCw, Swords } from "lucide-react";
+import type { AppSettings, SparringConfig } from "../lib/types";
 import { api } from "../lib/api";
+import { useMeetingStore } from "../stores/meetingStore";
 
 const DEFAULT_SETTINGS: AppSettings = {
   llm_provider: "ollama",
@@ -12,7 +13,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   wake_word: "hey lime",
   auto_analyze: true,
   audio_source: "microphone",
+  personality_mode: "thinking-partner",
+  sparring_config: { intensity: 5, focus_areas: ["logic", "assumptions"] },
 };
+
+const SPARRING_FOCUS_OPTIONS: { id: SparringConfig["focus_areas"][number]; label: string; description: string }[] = [
+  { id: "logic", label: "Logic", description: "Challenge reasoning and arguments" },
+  { id: "assumptions", label: "Assumptions", description: "Question underlying assumptions" },
+  { id: "feasibility", label: "Feasibility", description: "Test practical viability" },
+  { id: "risks", label: "Risks", description: "Expose potential risks and pitfalls" },
+  { id: "alternatives", label: "Alternatives", description: "Push for unconsidered options" },
+];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -237,6 +248,71 @@ export default function SettingsView() {
             />
           </Row>
         )}
+      </Section>
+
+      {/* Sparring Partner */}
+      <Section title="Sparring Partner">
+        <Row
+          label="Default Intensity"
+          description={`Level ${settings.sparring_config.intensity}/10 — controls how aggressively ideas are challenged`}
+        >
+          <div className="flex items-center gap-2">
+            <Swords size={13} className="text-red-400" />
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={1}
+              value={settings.sparring_config.intensity}
+              onChange={(e) =>
+                update("sparring_config", {
+                  ...settings.sparring_config,
+                  intensity: parseInt(e.target.value),
+                })
+              }
+              className="w-24 accent-red-500"
+            />
+            <span className="text-xs text-red-400 w-6 text-right font-medium">
+              {settings.sparring_config.intensity}
+            </span>
+          </div>
+        </Row>
+        <div className="px-4 py-3">
+          <p className="text-sm text-[var(--lime-text)] mb-2">Focus Areas</p>
+          <p className="text-xs text-[var(--lime-text-muted)] mb-3">
+            Choose what the sparring partner emphasizes when challenging your ideas.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SPARRING_FOCUS_OPTIONS.map((opt) => {
+              const isActive = settings.sparring_config.focus_areas.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => {
+                    const current = settings.sparring_config.focus_areas;
+                    const next = isActive
+                      ? current.filter((a) => a !== opt.id)
+                      : [...current, opt.id];
+                    if (next.length > 0) {
+                      update("sparring_config", {
+                        ...settings.sparring_config,
+                        focus_areas: next as SparringConfig["focus_areas"],
+                      });
+                    }
+                  }}
+                  className={`px-2.5 py-1.5 rounded-md text-xs transition-colors border ${
+                    isActive
+                      ? "border-red-500/30 text-red-400 bg-red-500/10"
+                      : "border-[var(--lime-border)] text-[var(--lime-text-muted)] hover:border-[#404040]"
+                  }`}
+                  title={opt.description}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </Section>
 
       {/* Memory */}

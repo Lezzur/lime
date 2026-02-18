@@ -63,11 +63,57 @@ export interface Insight {
   confidence: number;
 }
 
+export type ConnectionType =
+  | "shared_topic"
+  | "shared_person"
+  | "follow_up"
+  | "contradiction"
+  | "decision_referenced"
+  | "action_dependency"
+  | "recurring_theme";
+
+export interface SharedEntity {
+  type: "person" | "project" | "topic" | "decision" | "action_item";
+  name: string;
+  context?: string;
+}
+
 export interface Connection {
   meeting_id: string;
   meeting_title?: string;
+  meeting_date?: string;
   relationship: string;
+  connection_type?: ConnectionType;
+  shared_entities?: SharedEntity[];
+  strength?: number; // 0-1
   confidence: number;
+  is_contradiction?: boolean;
+  contradiction_detail?: string;
+}
+
+export interface CrossMeetingCluster {
+  id: string;
+  label: string;
+  theme: string;
+  meeting_ids: string[];
+  meetings: { id: string; title: string; date: string }[];
+  shared_entities: SharedEntity[];
+  connection_count: number;
+  strongest_link: number;
+}
+
+export interface CrossMeetingData {
+  clusters: CrossMeetingCluster[];
+  connections: (Connection & { source_meeting_id: string; source_meeting_title?: string })[];
+  total_meetings_analyzed: number;
+  contradictions: {
+    meeting_a_id: string;
+    meeting_a_title?: string;
+    meeting_b_id: string;
+    meeting_b_title?: string;
+    detail: string;
+    confidence: number;
+  }[];
 }
 
 export interface TopicSegment {
@@ -101,7 +147,12 @@ export interface ConnectionsData {
   connections: Connection[];
 }
 
-export type PersonalityMode = "neutral" | "strategist" | "analyst" | "coach";
+export type PersonalityMode = "scribe" | "thinking-partner" | "sparring";
+
+export interface SparringConfig {
+  intensity: number; // 1-10
+  focus_areas: ("logic" | "assumptions" | "feasibility" | "risks" | "alternatives")[];
+}
 
 export interface AppSettings {
   llm_provider: "ollama" | "claude" | "openai";
@@ -112,4 +163,6 @@ export interface AppSettings {
   wake_word: string;
   auto_analyze: boolean;
   audio_source: "microphone" | "system" | "both";
+  personality_mode: PersonalityMode;
+  sparring_config: SparringConfig;
 }

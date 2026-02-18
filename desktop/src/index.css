@@ -15,23 +15,23 @@
   --accent-text: #0a0a0a;
 }
 
-/* Personality mode themes */
-[data-personality="strategist"] {
-  --accent: #8b5cf6;
-  --accent-muted: rgba(139, 92, 246, 0.15);
-  --accent-text: #ffffff;
-}
-
-[data-personality="analyst"] {
+/* Personality mode themes — spec: Scribe / Thinking Partner / Sparring */
+[data-personality="scribe"] {
   --accent: #3b82f6;
   --accent-muted: rgba(59, 130, 246, 0.15);
   --accent-text: #ffffff;
 }
 
-[data-personality="coach"] {
-  --accent: #f59e0b;
-  --accent-muted: rgba(245, 158, 11, 0.15);
+[data-personality="thinking-partner"] {
+  --accent: #84cc16;
+  --accent-muted: rgba(132, 204, 22, 0.15);
   --accent-text: #0a0a0a;
+}
+
+[data-personality="sparring"] {
+  --accent: #ef4444;
+  --accent-muted: rgba(239, 68, 68, 0.15);
+  --accent-text: #ffffff;
 }
 
 body {
