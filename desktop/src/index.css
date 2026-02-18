@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  --lime-primary: #84cc16;
+  --lime-primary-muted: rgba(132, 204, 22, 0.15);
+  --lime-bg: #0a0a0a;
+  --lime-surface: #141414;
+  --lime-surface-2: #1a1a1a;
+  --lime-border: #262626;
+  --lime-text: #fafafa;
+  --lime-text-muted: #a3a3a3;
+  --lime-text-dim: #525252;
+  --accent: #84cc16;
+  --accent-muted: rgba(132, 204, 22, 0.15);
+  --accent-text: #0a0a0a;
+}
+
+/* Personality mode themes */
+[data-personality="strategist"] {
+  --accent: #8b5cf6;
+  --accent-muted: rgba(139, 92, 246, 0.15);
+  --accent-text: #ffffff;
+}
+
+[data-personality="analyst"] {
+  --accent: #3b82f6;
+  --accent-muted: rgba(59, 130, 246, 0.15);
+  --accent-text: #ffffff;
+}
+
+[data-personality="coach"] {
+  --accent: #f59e0b;
+  --accent-muted: rgba(245, 158, 11, 0.15);
+  --accent-text: #0a0a0a;
+}
+
+body {
+  margin: 0;
+  background-color: var(--lime-bg);
+  color: var(--lime-text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Allow text selection in editable areas */
+.selectable {
+  user-select: text;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--lime-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+
+/* TipTap editor styles */
+.tiptap-editor {
+  outline: none;
+  min-height: 80px;
+}
+
+.tiptap-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--lime-text-dim);
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap-editor p {
+  margin: 0 0 0.5rem 0;
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+  padding-left: 1.25rem;
+  margin: 0.25rem 0;
+}
+
+.tiptap-editor strong {
+  font-weight: 600;
+  color: var(--lime-text);
+}
