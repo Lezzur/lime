@@ -2,13 +2,18 @@
 FastAPI REST routes for LIME Phase 2.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional
+from pathlib import Path
+from datetime import datetime, timezone
 import json
 import logging
 import threading
+import uuid
+import shutil
 
 from backend.config.settings import settings
 from backend.storage.database import get_db_session
@@ -16,9 +21,9 @@ from backend.models.meeting import (
     Meeting, MeetingStatus, TranscriptSegment, Speaker,
     MeetingAnalysis, ActionItem, AnalysisDecision, TopicSegment,
     UserCorrection,
+    AudioSource as ModelAudioSource,
 )
 from backend.audio.capture import AudioSource, list_audio_devices
-from backend.learning.scheduler import register_activity_indicator
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +33,11 @@ router = APIRouter(prefix="/api")
 _active_sessions: dict = {}
 
 # Register active meetings as a busy signal for the consolidation scheduler
-register_activity_indicator(lambda: len(_active_sessions) > 0)
+try:
+    from backend.learning.scheduler import register_activity_indicator
+    register_activity_indicator(lambda: len(_active_sessions) > 0)
+except Exception:
+    logger.warning("Could not register activity indicator with consolidation scheduler")
 
 
 # ── Request / Response Models ─────────────────────────────────────────────────
@@ -169,6 +178,24 @@ def list_meetings(
             segment_count=len(m.segments),
         ))
     return results
+
+
+@router.get("/meetings/{meeting_id}", response_model=MeetingSummary)
+def get_meeting(meeting_id: str, db: Session = Depends(get_db_session)):
+    """Get a single meeting by ID."""
+    m = db.get(Meeting, meeting_id)
+    if not m:
+        raise HTTPException(404, "Meeting not found")
+    return MeetingSummary(
+        id=m.id,
+        title=m.title,
+        status=m.status.value,
+        audio_source=m.audio_source.value,
+        started_at=m.started_at.isoformat(),
+        ended_at=m.ended_at.isoformat() if m.ended_at else None,
+        duration_seconds=m.duration_seconds,
+        segment_count=len(m.segments),
+    )
 
 
 @router.get("/devices")
@@ -724,3 +751,246 @@ def get_corrections(meeting_id: str, db: Session = Depends(get_db_session)):
         }
         for c in corrections
     ]
+
+
+# ── Audio Upload Endpoints ────────────────────────────────────────────────────
+
+@router.post("/meetings/upload")
+async def upload_meeting_audio(
+    audio: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    db: Session = Depends(get_db_session),
+):
+    """Upload an audio file to create a new meeting."""
+    meeting_id = str(uuid.uuid4())
+    audio_dir = Path(settings.audio_dir)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    suffix = Path(audio.filename).suffix if audio.filename else ".wav"
+    audio_path = audio_dir / f"{meeting_id}{suffix}"
+
+    with open(audio_path, "wb") as f:
+        shutil.copyfileobj(audio.file, f)
+
+    meeting = Meeting(
+        id=meeting_id,
+        title=title or audio.filename or "Uploaded Meeting",
+        status=MeetingStatus.processing,
+        audio_source=ModelAudioSource.microphone,
+        raw_audio_path=str(audio_path),
+    )
+    db.add(meeting)
+    db.commit()
+
+    # Trigger processing in background
+    def _run():
+        try:
+            from backend.intelligence.pipeline import pipeline
+            pipeline.process(meeting_id)
+        except Exception as e:
+            logger.error(f"Upload processing failed for {meeting_id}: {e}")
+
+    thread = threading.Thread(target=_run, daemon=True, name=f"upload-{meeting_id[:8]}")
+    thread.start()
+
+    return {"meeting_id": meeting_id, "status": "processing", "audio_path": str(audio_path)}
+
+
+@router.post("/voice-memo")
+async def upload_voice_memo(
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db_session),
+):
+    """Upload a voice memo (lightweight meeting record)."""
+    memo_id = str(uuid.uuid4())
+    audio_dir = Path(settings.audio_dir)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    suffix = Path(audio.filename).suffix if audio.filename else ".webm"
+    audio_path = audio_dir / f"memo_{memo_id}{suffix}"
+
+    with open(audio_path, "wb") as f:
+        shutil.copyfileobj(audio.file, f)
+
+    meeting = Meeting(
+        id=memo_id,
+        title="Voice Memo",
+        status=MeetingStatus.processing,
+        audio_source=ModelAudioSource.microphone,
+        raw_audio_path=str(audio_path),
+    )
+    db.add(meeting)
+    db.commit()
+
+    return {"meeting_id": memo_id, "status": "processing", "audio_path": str(audio_path)}
+
+
+# ── Audio Streaming ───────────────────────────────────────────────────────────
+
+@router.get("/meetings/{meeting_id}/audio")
+def get_meeting_audio(meeting_id: str, db: Session = Depends(get_db_session)):
+    """Stream or download the audio file for a meeting."""
+    meeting = db.get(Meeting, meeting_id)
+    if not meeting:
+        raise HTTPException(404, "Meeting not found")
+
+    # Try compressed first, fall back to raw
+    audio_path = None
+    if meeting.compressed_audio_path:
+        p = Path(meeting.compressed_audio_path)
+        if p.exists():
+            audio_path = p
+    if audio_path is None and meeting.raw_audio_path:
+        p = Path(meeting.raw_audio_path)
+        if p.exists():
+            audio_path = p
+
+    if audio_path is None:
+        # Search audio_dir by meeting ID
+        audio_dir = Path(settings.audio_dir)
+        for ext in (".wav", ".mp3", ".ogg", ".webm", ".m4a"):
+            candidate = audio_dir / f"{meeting_id}{ext}"
+            if candidate.exists():
+                audio_path = candidate
+                break
+
+    if audio_path is None:
+        raise HTTPException(404, "Audio file not found")
+
+    return FileResponse(
+        path=str(audio_path),
+        filename=audio_path.name,
+        media_type="audio/mpeg",
+    )
+
+
+# ── Full Settings Endpoints ──────────────────────────────────────────────────
+
+class SettingsOut(BaseModel):
+    llm_provider: str
+    ollama_base_url: str
+    ollama_model: str
+    anthropic_model: str
+    whisper_model: str
+    confidence_badge_threshold: float
+    transcription_provider: str
+    sample_rate: int
+    api_host: str
+    api_port: int
+
+
+class SettingsUpdateRequest(BaseModel):
+    llm_provider: Optional[str] = None
+    ollama_base_url: Optional[str] = None
+    ollama_model: Optional[str] = None
+    anthropic_model: Optional[str] = None
+    whisper_model: Optional[str] = None
+    confidence_badge_threshold: Optional[float] = None
+    transcription_provider: Optional[str] = None
+
+
+@router.get("/settings", response_model=SettingsOut)
+def get_settings():
+    """Get current application settings."""
+    return SettingsOut(
+        llm_provider=settings.llm_provider,
+        ollama_base_url=settings.ollama_base_url,
+        ollama_model=settings.ollama_model,
+        anthropic_model=settings.anthropic_model,
+        whisper_model=settings.whisper_model,
+        confidence_badge_threshold=settings.confidence_badge_threshold,
+        transcription_provider=settings.transcription_provider,
+        sample_rate=settings.sample_rate,
+        api_host=settings.api_host,
+        api_port=settings.api_port,
+    )
+
+
+@router.patch("/settings")
+def update_settings(req: SettingsUpdateRequest):
+    """Update application settings (in-memory, non-persistent)."""
+    updated = {}
+    if req.llm_provider is not None:
+        settings.llm_provider = req.llm_provider
+        updated["llm_provider"] = req.llm_provider
+    if req.ollama_base_url is not None:
+        settings.ollama_base_url = req.ollama_base_url
+        updated["ollama_base_url"] = req.ollama_base_url
+    if req.ollama_model is not None:
+        settings.ollama_model = req.ollama_model
+        updated["ollama_model"] = req.ollama_model
+    if req.anthropic_model is not None:
+        settings.anthropic_model = req.anthropic_model
+        updated["anthropic_model"] = req.anthropic_model
+    if req.whisper_model is not None:
+        settings.whisper_model = req.whisper_model
+        updated["whisper_model"] = req.whisper_model
+    if req.confidence_badge_threshold is not None:
+        if not 0.0 <= req.confidence_badge_threshold <= 1.0:
+            raise HTTPException(400, "confidence_badge_threshold must be between 0.0 and 1.0")
+        settings.confidence_badge_threshold = req.confidence_badge_threshold
+        updated["confidence_badge_threshold"] = req.confidence_badge_threshold
+    if req.transcription_provider is not None:
+        settings.transcription_provider = req.transcription_provider
+        updated["transcription_provider"] = req.transcription_provider
+
+    if not updated:
+        raise HTTPException(400, "No valid fields to update")
+    return {"status": "updated", "updated": updated}
+
+
+# ── Cross-Meeting Connections ────────────────────────────────────────────────
+
+@router.get("/connections/cross-meeting")
+def get_cross_meeting_connections(db: Session = Depends(get_db_session)):
+    """Get cross-meeting connections from the knowledge graph."""
+    try:
+        from backend.knowledge.graph import knowledge_graph
+    except Exception:
+        return {
+            "people_referenced": [],
+            "projects_referenced": [],
+            "topics_referenced": [],
+            "past_meeting_links": [],
+            "contradictions": [],
+            "open_threads": [],
+        }
+
+    graph = knowledge_graph
+    people = []
+    projects = []
+    topics = []
+
+    for node_id, data in graph._graph.nodes(data=True):
+        entity_type = data.get("entity_type", "")
+        label = data.get("label", node_id)
+        # Count edges (meetings this entity appears in)
+        edges = list(graph._graph.edges(node_id, data=True))
+        meeting_ids = set()
+        for _, target, edge_data in edges:
+            mid = edge_data.get("meeting_id")
+            if mid:
+                meeting_ids.add(mid)
+
+        entry = {
+            "id": node_id,
+            "label": label,
+            "meeting_count": len(meeting_ids),
+            "meeting_ids": list(meeting_ids)[:10],
+        }
+
+        if entity_type == "person":
+            people.append(entry)
+        elif entity_type == "project":
+            projects.append(entry)
+        elif entity_type == "topic":
+            topics.append(entry)
+
+    return {
+        "people_referenced": sorted(people, key=lambda x: x["meeting_count"], reverse=True),
+        "projects_referenced": sorted(projects, key=lambda x: x["meeting_count"], reverse=True),
+        "topics_referenced": sorted(topics, key=lambda x: x["meeting_count"], reverse=True),
+        "past_meeting_links": [],
+        "contradictions": [],
+        "open_threads": [],
+    }

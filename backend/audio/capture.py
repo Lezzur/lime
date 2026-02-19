@@ -17,11 +17,26 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import sounddevice as sd
 
 from backend.config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+sd = None  # lazy-loaded
+
+
+def _get_sd():
+    global sd
+    if sd is None:
+        try:
+            import sounddevice as _sd
+            sd = _sd
+        except ImportError:
+            raise RuntimeError(
+                "sounddevice is not installed. "
+                "Install it with: pip install sounddevice"
+            )
+    return sd
 
 
 class AudioSource(str, Enum):
@@ -48,7 +63,7 @@ class AudioCapture:
             maxlen=int(self.ring_buffer_seconds * self.sample_rate)
         )
         self._audio_queue: queue.Queue[tuple[np.ndarray, float]] = queue.Queue()
-        self._stream: Optional[sd.InputStream] = None
+        self._stream = None
         self._recording = False
         self._start_time: Optional[float] = None
         self._raw_frames: list[np.ndarray] = []
@@ -83,7 +98,7 @@ class AudioCapture:
 
         logger.info(f"Starting audio capture | source={self.source.value} | device={device}")
 
-        self._stream = sd.InputStream(
+        self._stream = _get_sd().InputStream(
             samplerate=self.sample_rate,
             channels=self.channels,
             dtype="float32",
@@ -135,7 +150,7 @@ class AudioCapture:
         if settings.system_audio_device_index is not None:
             return settings.system_audio_device_index
 
-        devices = sd.query_devices()
+        devices = _get_sd().query_devices()
         for i, dev in enumerate(devices):
             name = dev.get("name", "").lower()
             # WASAPI loopback devices typically have "loopback" in the name
@@ -173,13 +188,14 @@ class AudioCapture:
 def list_audio_devices() -> list[dict]:
     """Return all available audio devices with index and name."""
     devices = []
-    for i, dev in enumerate(sd.query_devices()):
+    _sd = _get_sd()
+    for i, dev in enumerate(_sd.query_devices()):
         devices.append({
             "index": i,
             "name": dev["name"],
             "max_input_channels": dev["max_input_channels"],
             "max_output_channels": dev["max_output_channels"],
             "default_samplerate": dev["default_samplerate"],
-            "hostapi": sd.query_hostapis(dev["hostapi"])["name"],
+            "hostapi": _sd.query_hostapis(dev["hostapi"])["name"],
         })
     return devices

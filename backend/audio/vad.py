@@ -10,7 +10,6 @@ import threading
 from typing import Optional
 
 import numpy as np
-import torch
 
 from backend.config.settings import settings
 
@@ -25,6 +24,13 @@ def _load_model():
     global _vad_model, _vad_utils
     with _model_lock:
         if _vad_model is None:
+            try:
+                import torch
+            except ImportError:
+                raise RuntimeError(
+                    "torch is not installed. "
+                    "Install it with: pip install torch"
+                )
             logger.info("Loading Silero VAD model...")
             _vad_model, _vad_utils = torch.hub.load(
                 repo_or_dir="snakers4/silero-vad",
@@ -100,6 +106,7 @@ class VADFilter:
                     # Pad last window
                     window = np.pad(window, (0, self.WINDOW_SIZE_SAMPLES - len(window)))
 
+                import torch
                 tensor = torch.from_numpy(window).float()
                 with torch.no_grad():
                     prob = self._model(tensor, sample_rate).item()

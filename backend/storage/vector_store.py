@@ -16,9 +16,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-
 from backend.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -35,23 +32,33 @@ class VectorStore:
     def __init__(self, persist_dir: Optional[Path] = None):
         self._persist_dir = str(persist_dir or CHROMA_DIR)
         Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
-        self._client = chromadb.PersistentClient(
-            path=self._persist_dir,
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-        self._segments = self._client.get_or_create_collection(
-            name=self.SEGMENTS_COLLECTION,
-            metadata={"hnsw:space": "cosine"},
-        )
-        self._summaries = self._client.get_or_create_collection(
-            name=self.SUMMARIES_COLLECTION,
-            metadata={"hnsw:space": "cosine"},
-        )
-        logger.info(
-            f"VectorStore initialized: "
-            f"{self._segments.count()} segments, "
-            f"{self._summaries.count()} summaries"
-        )
+        try:
+            import chromadb
+            from chromadb.config import Settings as ChromaSettings
+            self._client = chromadb.PersistentClient(
+                path=self._persist_dir,
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+            self._segments = self._client.get_or_create_collection(
+                name=self.SEGMENTS_COLLECTION,
+                metadata={"hnsw:space": "cosine"},
+            )
+            self._summaries = self._client.get_or_create_collection(
+                name=self.SUMMARIES_COLLECTION,
+                metadata={"hnsw:space": "cosine"},
+            )
+            self._available = True
+            logger.info(
+                f"VectorStore initialized: "
+                f"{self._segments.count()} segments, "
+                f"{self._summaries.count()} summaries"
+            )
+        except Exception as e:
+            logger.warning(f"ChromaDB unavailable, vector search disabled: {e}")
+            self._client = None
+            self._segments = None
+            self._summaries = None
+            self._available = False
 
     def add_segments(
         self,
@@ -68,7 +75,7 @@ class VectorStore:
           - end_time: float
           - speaker: optional speaker name
         """
-        if not segments:
+        if not self._available or not segments:
             return
 
         ids = []
@@ -102,7 +109,7 @@ class VectorStore:
 
         summary_type: "executive" | "topic" | "action_items" | "decisions"
         """
-        if not text.strip():
+        if not self._available or not text.strip():
             return
 
         doc_id = f"{meeting_id}_{summary_type}"
@@ -122,6 +129,8 @@ class VectorStore:
         meeting_id: Optional[str] = None,
     ) -> list[dict]:
         """Semantic search across transcript segments."""
+        if not self._available:
+            return []
         where = {"meeting_id": meeting_id} if meeting_id else None
 
         results = self._segments.query(
@@ -140,6 +149,8 @@ class VectorStore:
         summary_type: Optional[str] = None,
     ) -> list[dict]:
         """Semantic search across meeting summaries."""
+        if not self._available:
+            return []
         where = {"summary_type": summary_type} if summary_type else None
 
         results = self._summaries.query(
@@ -161,6 +172,8 @@ class VectorStore:
         Find meetings related to a query by searching summaries.
         Returns unique meeting IDs with relevance scores.
         """
+        if not self._available:
+            return []
         results = self._summaries.query(
             query_texts=[query],
             n_results=n_results * 2,
@@ -191,6 +204,8 @@ class VectorStore:
         meeting_id: str,
     ) -> list[dict]:
         """Get all stored content for a specific meeting."""
+        if not self._available:
+            return []
         seg_results = self._segments.get(
             where={"meeting_id": meeting_id},
             include=["documents", "metadatas"],
@@ -212,6 +227,8 @@ class VectorStore:
 
     def delete_meeting(self, meeting_id: str):
         """Remove all embeddings for a meeting."""
+        if not self._available:
+            return
         seg_results = self._segments.get(
             where={"meeting_id": meeting_id},
         )
@@ -227,9 +244,12 @@ class VectorStore:
         logger.info(f"Deleted embeddings for meeting {meeting_id[:8]}")
 
     def stats(self) -> dict:
+        if not self._available:
+            return {"segments_count": 0, "summaries_count": 0, "available": False}
         return {
             "segments_count": self._segments.count(),
             "summaries_count": self._summaries.count(),
+            "available": True,
         }
 
     def _format_results(self, results: dict) -> list[dict]:
@@ -252,5 +272,22 @@ class VectorStore:
         return formatted
 
 
-# Module-level singleton
-vector_store = VectorStore()
+# Lazy singleton — initialized on first access
+_vector_store_instance: Optional[VectorStore] = None
+
+
+def _get_vector_store() -> VectorStore:
+    global _vector_store_instance
+    if _vector_store_instance is None:
+        _vector_store_instance = VectorStore()
+    return _vector_store_instance
+
+
+class _VectorStoreProxy:
+    """Proxy that lazily initializes VectorStore on first attribute access."""
+
+    def __getattr__(self, name):
+        return getattr(_get_vector_store(), name)
+
+
+vector_store = _VectorStoreProxy()

@@ -10,14 +10,23 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config.settings import settings
 from backend.storage.database import init_db
-from backend.audio.compressor import compressor
-from backend.learning.scheduler import scheduler as consolidation_scheduler
 from backend.api.routes import router
 from backend.api.knowledge_routes import router as knowledge_router
 from backend.api.websocket import ws_live_transcript
 from backend.api.push_routes import router as push_router
 from backend.api.crypto_routes import router as crypto_router
 from backend.api.sync_routes import router as sync_router
+
+compressor = None
+consolidation_scheduler = None
+try:
+    from backend.audio.compressor import compressor
+except Exception:
+    pass
+try:
+    from backend.learning.scheduler import scheduler as consolidation_scheduler
+except Exception:
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,13 +45,31 @@ async def lifespan(app: FastAPI):
     logger.info("LIME backend starting...")
     init_db()
     # Initialize knowledge graph (loads from JSON if exists)
-    from backend.knowledge.graph import knowledge_graph  # noqa: F401
-    logger.info(f"Knowledge graph: {knowledge_graph.stats()}")
+    try:
+        from backend.knowledge.graph import knowledge_graph  # noqa: F401
+        logger.info(f"Knowledge graph: {knowledge_graph.stats()}")
+    except Exception as e:
+        logger.warning(f"Knowledge graph unavailable (degraded): {e}")
     # Initialize ChromaDB vector store
-    from backend.storage.vector_store import vector_store  # noqa: F401
-    logger.info(f"Vector store: {vector_store.stats()}")
-    compressor.start()
-    consolidation_scheduler.start()
+    try:
+        from backend.storage.vector_store import vector_store  # noqa: F401
+        logger.info(f"Vector store: {vector_store.stats()}")
+    except Exception as e:
+        logger.warning(f"Vector store unavailable (degraded): {e}")
+    if compressor:
+        try:
+            compressor.start()
+        except Exception as e:
+            logger.warning(f"Audio compressor unavailable (degraded): {e}")
+    else:
+        logger.warning("Audio compressor not loaded (degraded)")
+    if consolidation_scheduler:
+        try:
+            consolidation_scheduler.start()
+        except Exception as e:
+            logger.warning(f"Consolidation scheduler unavailable (degraded): {e}")
+    else:
+        logger.warning("Consolidation scheduler not loaded (degraded)")
     # Initialize sync engine (if enabled)
     if settings.sync_enabled:
         from backend.sync.engine import sync_engine
@@ -55,8 +82,10 @@ async def lifespan(app: FastAPI):
     if settings.sync_enabled:
         from backend.sync.engine import sync_engine
         await sync_engine.stop_auto_sync()
-    consolidation_scheduler.stop()
-    compressor.stop()
+    if consolidation_scheduler:
+        consolidation_scheduler.stop()
+    if compressor:
+        compressor.stop()
 
 
 app = FastAPI(
